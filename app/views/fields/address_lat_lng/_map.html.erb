@@ -1,0 +1,101 @@
+<div class="map-container">
+  <div id="addresslatlngmap"></div>
+</div>
+<% content_for :javascript do %>
+  <%= content_tag(:script, '', src: "https://maps.googleapis.com/maps/api/js?key=#{field.google_api_key}&libraries=places") %>
+  <script type="text/javascript">
+    // Get the centre lat/lng from the field or the initial default if the field
+    // hasn't been set yet
+    if (lng === undefined) {
+      var initLatLng = new google.maps.LatLng(<%= field.initial.to_json %>[0], <%= field.initial.to_json %>[1]);
+    } else {
+      var initLatLng = new google.maps.LatLng(lat, lng)
+    }
+
+    // Attach a google map to the div above
+    var map = new google.maps.Map(
+      document.querySelector("#addresslatlngmap"),
+      {
+        center: initLatLng,
+        zoom: <%= field.zoom %>
+      }
+    );
+
+    var createMarker = function(latlng) {
+      marker = new google.maps.Marker({
+        position: latlng,
+        map: map
+      });
+    };
+
+    var setMarker = function (latlng) {
+      if (marker === undefined) {
+        createMarker(latlng);
+      } else {
+        marker.setMap(null);
+        createMarker(latlng);
+      }
+      $('.addresslatlng-lat').val(latlng.lat);
+      $('.addresslatlng-lng').val(latlng.lng);
+      <% if field.search? %>
+        setAddressFromLatLng(latlng, ".addresslatlng-address");
+      <% end %>
+    };
+
+    var setAddressFromLatLng = function (latlng, inputAddressSelector) {
+      var geocoder = new google.maps.Geocoder();
+      geocoder.geocode({
+        'location': latlng
+      }, function (results, status) {
+        if (status === google.maps.GeocoderStatus.OK) {
+          if (results[1]) {
+            address = results[0].formatted_address;
+            $(inputAddressSelector).val(address)
+          }
+        }
+      });
+    }
+
+    // Add a marker if the field has been set already
+    var marker;
+    if (lng !== undefined) {
+      createMarker(initLatLng);
+    }
+    <% if edit %>
+      // In edit mode, move the marker and update the fields when a user clicks
+      // inside the map
+      map.addListener('click', function (event) {
+        setMarker(event.latLng);
+      });
+    <% end %>
+
+    <% if field.search? %>
+      let autocomplete = new google.maps.places.Autocomplete(
+        /** @type {!HTMLInputElement} */
+        (document.querySelector(
+          ".addresslatlng-address"
+        )), {
+          types: ["geocode"]
+        }
+      );
+
+      autocomplete.addListener('place_changed', function (e) {
+        var place = autocomplete.getPlace();
+        if (!place.geometry) {
+          // User entered the name of a Place that was not suggested and
+          // pressed the Enter key, or the Place Details request failed.
+          window.alert("No details available for input: '" + place.name + "'");
+          return;
+        }
+
+        if (place.geometry.viewport) {
+          map.fitBounds(place.geometry.viewport);
+        } else {
+          map.setCenter(place.geometry.location);
+          map.setZoom(17);  // Why 17? Because it looks good.
+        }
+        setMarker(place.geometry.location);
+      })
+    <% end %>
+  </script>
+<% end %>

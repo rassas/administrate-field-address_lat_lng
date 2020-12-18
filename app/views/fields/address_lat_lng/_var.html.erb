@@ -1,0 +1,5 @@
+<% content_for :javascript do %>
+  <script type="text/javascript">
+    var <%= field.which %> = <%= field.data || 'undefined' %>;
+  </script>
+<% end %>

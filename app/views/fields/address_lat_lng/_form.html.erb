@@ -1,0 +1,12 @@
+<% if field.which == :address %>
+  <div class="field-unit__label">
+    <%= f.label field.attribute %>
+  </div>
+  <div class="field-unit__field">
+    <%= f.text_field field.attribute, class: "addresslatlng-#{field.which}" %>
+  </div>
+<% else %>
+  <%= f.hidden_field field.attribute, class: "addresslatlng-#{field.which}" %>
+<% end %>
+<%= render 'fields/address_lat_lng/var', field: field if field.which != :address %>
+<%= render 'fields/address_lat_lng/map', edit: true, field: field if field.lng? %>

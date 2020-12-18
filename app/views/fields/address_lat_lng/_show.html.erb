@@ -1,0 +1,3 @@
+<%= field.to_s %>
+<%= render 'fields/address_lat_lng/var', field: field %>
+<%= render 'fields/address_lat_lng/map', edit: false, field: field if field.lng? %>
