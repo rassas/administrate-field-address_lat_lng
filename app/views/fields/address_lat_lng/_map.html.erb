@@ -2,7 +2,7 @@
   <div id="addresslatlngmap"></div>
 </div>
 <% content_for :javascript do %>
-  <%= content_tag(:script, '', src: "https://maps.googleapis.com/maps/api/js?key=#{field.google_api_key}&libraries=places") %>
+  <%= content_tag(:script, '', src: "https://maps.googleapis.com/maps/api/js?key=#{field.google_api_key}&libraries=places,drawing") %>
   <script type="text/javascript">
     // Get the centre lat/lng from the field or the initial default if the field
     // hasn't been set yet
@@ -20,6 +20,149 @@
         zoom: <%= field.zoom %>
       }
     );
+    if (<%= field.shape? %>) {
+      var dataDraw = []
+      var shapeInput = document.querySelector("input[name='demand[current_shape]']")
+      var dataShape = document.querySelector("#current_shape")
+      var colorShapeOptions = {
+      fillOpacity: 0.1,
+      strokeWeight: 2,
+      clickable: true,
+      editable: true,
+      draggable: true,
+      geodesic: true,
+      zIndex: 1,
+      }
+      if(dataShape || shapeInput.value != ''){
+        var drawShapeZone = function(shape,map, colorShapeOptions){
+          const colorShape = colorShapeOptions
+          const coords = shape.coords
+          switch (shape.type) {
+            case "polygon":
+              shape_zone = new google.maps.Polygon({
+                paths: coords,
+                colorShape
+              });
+              shape_zone.setMap(map);
+              break;
+            case "circle":
+              shape_zone = new google.maps.Circle({
+                colorShape,
+                map,
+                center: {lat: coords.center.lat, lng: coords.center.lng},
+                radius: coords.radius,
+              });
+              break;
+            case "rectangle":
+              shape_zone = new google.maps.Rectangle({
+                colorShape,
+                map,
+                bounds: {
+                  north: coords.NE.lat,
+                  south: coords.SW.lat,
+                  east: coords.NE.lng,
+                  west: coords.SW.lng,
+                },
+              });
+            break;
+            default:
+              break;
+          }
+        }
+        if (dataShape) {
+          dataShape = JSON.parse(dataShape.nextElementSibling.innerText)
+        } else {
+          dataShape = JSON.parse(shapeInput.value)
+        }
+        drawShapeZone(dataShape,map,colorShapeOptions)
+      }
+      const drawingManager = new google.maps.drawing.DrawingManager({
+      drawingMode: google.maps.drawing.OverlayType.CIRCLE,
+      drawingControl: true,
+      drawingControlOptions: {
+        position: google.maps.ControlPosition.TOP_CENTER,
+        drawingModes: [
+          google.maps.drawing.OverlayType.CIRCLE,
+          google.maps.drawing.OverlayType.POLYGON,
+          google.maps.drawing.OverlayType.RECTANGLE,
+        ],
+      },
+      markerOptions: {
+        icon: "https://developers.google.com/maps/documentation/javascript/examples/full/images/beachflag.png",
+      },
+      circleOptions: colorShapeOptions,
+      polygonOptions: colorShapeOptions,
+      rectangleOptions: colorShapeOptions,
+      });
+      var dataShape = []
+      google.maps.event.addListener(drawingManager, 'overlaycomplete', function (event) {
+      var shape = event.overlay
+      var coords
+      switch (event.type) {
+        case "polygon":
+          coords = getShapeCoords(shape, event.type)
+          google.maps.event.addListener(shape.getPath(), 'set_at', function() {
+            coords = getShapeCoords(shape, event.type)
+            shapeInput.value = JSON.stringify({ coords: coords, type: event.type })
+          });
+          break;
+        case "circle":
+          coords = getShapeCoords(shape, event.type)
+          google.maps.event.addListener(shape, 'center_changed', function() {
+            coords = getShapeCoords(shape, event.type)
+            shapeInput.value = JSON.stringify({ coords: coords, type: event.type })
+          });
+          google.maps.event.addListener(shape, 'radius_changed', function() {
+            coords = getShapeCoords(shape, event.type)
+            shapeInput.value = JSON.stringify({ coords: coords, type: event.type })
+          });
+          break;
+        case "rectangle":
+          coords = getShapeCoords(shape, event.type)
+          google.maps.event.addListener(shape, 'bounds_changed', function() {
+            coords = getShapeCoords(shape, event.type)
+            shapeInput.value = JSON.stringify({ coords: coords, type: event.type })
+          });
+          break;
+        default:
+          break;
+      }
+      dataDraw.push({ coords: coords, type: event.type })
+      dataShape.push(shape)
+      if (dataShape.length > 1) {
+        dataShape[0].setMap(null)
+        dataDraw.shift()
+        dataShape.shift()
+      }
+      shapeInput.value = JSON.stringify(dataDraw[0])
+
+      });
+      drawingManager.setMap(this.map);
+    }
+
+    var getShapeCoords = function(shape, type){
+    var coords = {}
+    switch (type) {
+      case "polygon":
+          coords = shape.getPath().getArray().map(coord => {
+            return {
+              lat: coord.lat(),
+              lng: coord.lng()
+            }
+          });
+          break;
+        case "circle":
+          coords = { radius: shape.getRadius(), center: { lat: shape.getCenter().lat(), lng: shape.getCenter().lng() } }
+          break;
+        case "rectangle":
+          var bounds = shape.getBounds();
+          coords = { NE: { lat: bounds.getNorthEast().lat(), lng: bounds.getNorthEast().lng() }, SW: { lat: bounds.getSouthWest().lat(), lng: bounds.getSouthWest().lng() } }
+          break;
+        default:
+          break;
+    }
+    return coords;
+  }
 
     var createMarker = function(latlng) {
       marker = new google.maps.Marker({

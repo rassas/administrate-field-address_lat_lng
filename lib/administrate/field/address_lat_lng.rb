@@ -16,6 +16,9 @@ module Administrate
         end
       end
 
+      def shape?
+        options.fetch(:shape, attribute == :shape)
+      end
       # True if the :lat option has been provided, or field is called :lat
       def lat?
         options.fetch(:lat, attribute == :lat)
